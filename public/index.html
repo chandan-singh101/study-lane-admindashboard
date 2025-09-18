@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <style>
+    /* 🌙 Basic Reset & Theme */
+    * { box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      margin: 0; 
+      background: linear-gradient(135deg, #1e3c72, #2a5298); 
+      color: #fff;
+    }
+
+    h2 { text-align: center; margin: 20px 0; }
+    
+    /* 🔐 Login Card */
+    .login, .dashboard {
+      max-width: 450px;
+      margin: 40px auto;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    input, button, select {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    input {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    button {
+      background: #ff7f50;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.3s;
+    }
+    button:hover { background: #ff6333; transform: scale(1.05); }
+
+    /* 📦 Order Cards */
+    .orders-container { display: flex; flex-direction: column; gap: 15px; }
+    .card {
+      background: white;
+      color: #333;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      animation: slideUp 0.5s ease-in-out;
+    }
+    .card-header { font-weight: bold; margin-bottom: 10px; }
+    .card small { color: #666; }
+
+    /* 📱 Responsive */
+    @media (max-width: 600px) {
+      .login, .dashboard { margin: 20px; }
+    }
+
+    /* ✨ Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Status badge */
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+    .pending { background: orange; }
+    .preparing { background: royalblue; }
+    .in_transit { background: teal; }
+    .delivered { background: green; }
+    .failed { background: crimson; }
+    .cancelled { background: gray; }
+
+    /* Refresh Button */
+    .refresh-btn {
+      background: #00c9a7;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .refresh-btn:hover { background: #00a187; }
+    .refresh-btn span {
+      display: inline-block;
+      transition: transform 0.4s ease-in-out;
+    }
+    .refreshing span {
+      transform: rotate(360deg);
+    }
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div class="login" id="loginPage">
+    <h2>🔐 Admin Login</h2>
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <p id="loginMsg"></p>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="dashboard" id="dashboardPage" style="display:none;">
+    <h2>📦 Orders Dashboard</h2>
+    <button class="refresh-btn" id="refreshBtn" onclick="refreshOrders()">
+      🔄 <span>Refresh Orders</span>
+    </button>
+    <div class="orders-container" id="orders"></div>
+  </div>
+
+  <script>
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("dashboardPage").style.display = "block";
+        loadOrders();
+      } else {
+        document.getElementById("loginMsg").innerText = "❌ Invalid login!";
+      }
+    }
+
+    async function loadOrders() {
+      const res = await fetch("/orders");
+      const orders = await res.json();
+      const container = document.getElementById("orders");
+      container.innerHTML = "";
+
+      orders.forEach((order, i) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.animationDelay = `${i * 0.1}s`; // staggered animation
+
+        card.innerHTML = `
+          <div class="card-header">Order #${order.id} - ${order.user_name}</div>
+          <small>📞 ${order.user_phone} | 💺 ${order.seat_number || "N/A"}</small><br>
+          <small>💰 ₹${order.amount} (${order.currency})</small><br>
+          <small>Status: ${order.status}</small><br>
+          <small>Delivery: <span class="badge ${order.delivery_status}">${order.delivery_status}</span></small>
+          <div style="margin-top:10px;">
+            <select id="status-${order.id}">
+              <option ${order.delivery_status==="pending"?"selected":""}>pending</option>
+              <option ${order.delivery_status==="preparing"?"selected":""}>preparing</option>
+              <option ${order.delivery_status==="in_transit"?"selected":""}>in_transit</option>
+              <option ${order.delivery_status==="delivered"?"selected":""}>delivered</option>
+              <option ${order.delivery_status==="failed"?"selected":""}>failed</option>
+              <option ${order.delivery_status==="cancelled"?"selected":""}>cancelled</option>
+            </select>
+            <button onclick="updateStatus(${order.id})">✅ Update</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function updateStatus(id) {
+      const status = document.getElementById(`status-${id}`).value;
+      await fetch(`/orders/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery_status: status }),
+      });
+      loadOrders();
+    }
+
+    async function refreshOrders() {
+      const btn = document.getElementById("refreshBtn");
+      btn.classList.add("refreshing");
+      await loadOrders();
+      setTimeout(() => btn.classList.remove("refreshing"), 500);
+    }
+  </script>
+</body>
+</html>
